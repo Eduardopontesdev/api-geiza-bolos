@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
-import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -13,28 +12,14 @@ const prisma = new PrismaClient();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configuração do Multer para upload de imagens
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "uploads")); // Salva as imagens na pasta "uploads"
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Nome único para o arquivo
-  },
-});
-
-const upload = multer({ storage });
-
 // Middleware
 app.use(express.json());
 app.use(cors());
-app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // Serve as imagens estáticas
 
-// Rota para upload de imagem e cadastro de produto
-app.post("/produtos", upload.single("imagem"), async (req, res) => {
+// Rota para cadastro de produto com URL da imagem
+app.post("/produtos", async (req, res) => {
   try {
-    const { categoria, nome, descricao, valor } = req.body;
-    const imagem = req.file ? `/uploads/${req.file.filename}` : null; // URL da imagem
+    const { categoria, nome, descricao, valor, imagem } = req.body; // imagem agora é uma URL
 
     const produto = await prisma.produtos.create({
       data: {
@@ -42,7 +27,7 @@ app.post("/produtos", upload.single("imagem"), async (req, res) => {
         nome,
         descricao,
         valor: parseFloat(valor),
-        imagem,
+        imagem, // Salva a URL da imagem
       },
     });
 
@@ -83,10 +68,10 @@ app.get("/categorias", async (req, res) => {
 });
 
 // Rota para editar um produto pelo ID
-app.put("/produtos/:id", upload.single("imagem"), async (req, res) => {
+app.put("/produtos/:id", async (req, res) => {
   try {
     const { id } = req.params; // ID do produto a ser editado
-    const { categoria, nome, descricao, valor } = req.body;
+    const { categoria, nome, descricao, valor, imagem } = req.body; // imagem agora é uma URL
 
     // Verifica se o produto existe
     const produtoExistente = await prisma.produtos.findUnique({
@@ -105,7 +90,7 @@ app.put("/produtos/:id", upload.single("imagem"), async (req, res) => {
         nome: nome || produtoExistente.nome,
         descricao: descricao || produtoExistente.descricao,
         valor: valor ? parseFloat(valor) : produtoExistente.valor,
-        imagem: req.file ? `/uploads/${req.file.filename}` : produtoExistente.imagem, // Atualiza a imagem se uma nova for enviada
+        imagem: imagem || produtoExistente.imagem, // Atualiza a URL da imagem se fornecida
       },
     });
 
